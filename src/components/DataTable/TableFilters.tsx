@@ -1,4 +1,5 @@
-import type { Table } from '@tanstack/react-table';
+import { useState, useEffect, useCallback } from 'react';
+import type { Column, Table } from '@tanstack/react-table';
 import type { Employee } from '../../types';
 import { GRID_COLS } from './constants';
 
@@ -17,26 +18,63 @@ const inputBase = `
 `;
 const selectBase = `${inputBase} bg-slate-800`;
 
+function DebouncedInput({
+  column, placeholder, delay = 300,
+}: {
+  column: Column<Employee>; placeholder: string; delay?: number;
+}) {
+  const [value, setValue] = useState((column.getFilterValue() as string) ?? '');
+
+  useEffect(() => {
+    const external = (column.getFilterValue() as string) ?? '';
+    if (external !== value) setValue(external);
+  }, [column.getFilterValue()]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const t = setTimeout(() => column.setFilterValue(value || undefined), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <input className={inputBase} placeholder={placeholder} value={value} onChange={e => setValue(e.target.value)} />
+  );
+}
+
+function DebouncedNumberInput({
+  column, placeholder, delay = 300,
+}: {
+  column: Column<Employee>; placeholder: string; delay?: number;
+}) {
+  const [value, setValue] = useState(((column.getFilterValue() as [number?, number?]) ?? [])[0] ?? '');
+
+  useEffect(() => {
+    const ext = ((column.getFilterValue() as [number?, number?]) ?? [])[0] ?? '';
+    if (ext !== value) setValue(ext);
+  }, [column.getFilterValue()]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const num = value !== '' ? Number(value) : undefined;
+      column.setFilterValue(num !== undefined ? [num, Infinity] : undefined);
+    }, delay);
+    return () => clearTimeout(t);
+  }, [value, delay]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <input type="number" className={inputBase} placeholder={placeholder} value={value}
+      onChange={e => setValue(e.target.value === '' ? '' : Number(e.target.value))} />
+  );
+}
+
 export function TableFilters({ table }: TableFiltersProps) {
-  const col = (id: string) => table.getColumn(id)!;
+  const col = useCallback((id: string) => table.getColumn(id)!, [table]);
 
   return (
     <div className="border-b border-slate-800/80 bg-slate-900/40">
       <div className={`grid ${GRID_COLS}`}>
         <div />
-
-        <div className="px-3 py-2">
-          <input className={inputBase} placeholder="Search name…"
-            value={(col('name').getFilterValue() as string) ?? ''}
-            onChange={e => col('name').setFilterValue(e.target.value)} />
-        </div>
-
-        <div className="px-3 py-2">
-          <input className={inputBase} placeholder="Search email…"
-            value={(col('email').getFilterValue() as string) ?? ''}
-            onChange={e => col('email').setFilterValue(e.target.value)} />
-        </div>
-
+        <div className="px-3 py-2"><DebouncedInput column={col('name')} placeholder="Search name…" /></div>
+        <div className="px-3 py-2"><DebouncedInput column={col('email')} placeholder="Search email…" /></div>
         <div className="px-3 py-2">
           <select className={selectBase}
             value={(col('department').getFilterValue() as string) ?? ''}
@@ -44,32 +82,9 @@ export function TableFilters({ table }: TableFiltersProps) {
             {DEPARTMENTS.map(d => <option key={d} value={d}>{d || 'All depts'}</option>)}
           </select>
         </div>
-
-        <div className="px-3 py-2">
-          <input className={inputBase} placeholder="Search role…"
-            value={(col('role').getFilterValue() as string) ?? ''}
-            onChange={e => col('role').setFilterValue(e.target.value)} />
-        </div>
-
-        <div className="px-3 py-2">
-          <input type="number" className={inputBase} placeholder="Min $"
-            value={((col('salary').getFilterValue() as [number, number]) ?? [])[0] ?? ''}
-            onChange={e => {
-              const val = e.target.value ? Number(e.target.value) : undefined;
-              const cur = (col('salary').getFilterValue() as [number?, number?]) ?? [];
-              col('salary').setFilterValue([val, cur[1]]);
-            }} />
-        </div>
-
-        <div className="px-1 py-2">
-          <input type="number" className={inputBase} placeholder="≥"
-            value={((col('age').getFilterValue() as [number, number]) ?? [])[0] ?? ''}
-            onChange={e => {
-              const val = e.target.value ? Number(e.target.value) : undefined;
-              col('age').setFilterValue(val ? [val, 100] : undefined);
-            }} />
-        </div>
-
+        <div className="px-3 py-2"><DebouncedInput column={col('role')} placeholder="Search role…" /></div>
+        <div className="px-3 py-2"><DebouncedNumberInput column={col('salary')} placeholder="Min $" /></div>
+        <div className="px-1 py-2"><DebouncedNumberInput column={col('age')} placeholder="≥" /></div>
         <div className="px-3 py-2">
           <select className={selectBase}
             value={(col('status').getFilterValue() as string) ?? ''}
@@ -77,22 +92,12 @@ export function TableFilters({ table }: TableFiltersProps) {
             {STATUSES.map(s => <option key={s} value={s}>{s || 'All'}</option>)}
           </select>
         </div>
-
         <div className="px-3 py-2">
           <input type="date" className={inputBase}
             value={(col('startDate').getFilterValue() as string) ?? ''}
             onChange={e => col('startDate').setFilterValue(e.target.value || undefined)} />
         </div>
-
-        <div className="px-3 py-2">
-          <input type="number" className={inputBase} placeholder="Min score" min={0} max={100}
-            value={((col('performance').getFilterValue() as [number, number]) ?? [])[0] ?? ''}
-            onChange={e => {
-              const val = e.target.value ? Number(e.target.value) : undefined;
-              col('performance').setFilterValue(val ? [val, 100] : undefined);
-            }} />
-        </div>
-
+        <div className="px-3 py-2"><DebouncedNumberInput column={col('performance')} placeholder="Min score" /></div>
         <div />
       </div>
     </div>

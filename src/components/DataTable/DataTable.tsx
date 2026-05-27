@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   getCoreRowModel,
   getFilteredRowModel,
@@ -12,6 +12,7 @@ import {
 } from '@tanstack/react-table';
 import { useTableContext } from '../../context/TableContext';
 import { useUnsavedChanges } from '../../hooks/useUnsavedChanges';
+import { useDebounce } from '../../hooks/useDebounce';
 import type { Employee } from '../../types';
 import { TableToolbar } from './TableToolbar';
 import { TableFilters } from './TableFilters';
@@ -59,12 +60,13 @@ export function DataTable() {
   const { rows, dirtyRowIds } = useTableContext();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [globalFilter, setGlobalFilter] = useState('');
+  const [globalFilterInput, setGlobalFilterInput] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('virtual');
   const [showFilters, setShowFilters] = useState(false);
 
   useUnsavedChanges(dirtyRowIds.size > 0);
 
+  const globalFilter = useDebounce(globalFilterInput, 250);
   const data = useMemo(() => rows, [rows]);
 
   const table = useReactTable({
@@ -73,7 +75,7 @@ export function DataTable() {
     state: { sorting, columnFilters, globalFilter },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
-    onGlobalFilterChange: setGlobalFilter,
+    onGlobalFilterChange: setGlobalFilterInput,
     globalFilterFn,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -82,28 +84,31 @@ export function DataTable() {
     initialState: { pagination: { pageSize: 50 } },
   });
 
+  const handleSetViewMode = useCallback((v: ViewMode) => setViewMode(v), []);
+  const handleSetShowFilters = useCallback((v: boolean) => setShowFilters(v), []);
+  const handleClearFilters = useCallback(() => {
+    table.resetColumnFilters();
+    setGlobalFilterInput('');
+  }, [table]);
+
   return (
     <div className="flex flex-col h-full bg-slate-950 rounded-xl overflow-hidden ring-1 ring-slate-800 shadow-2xl shadow-black/40">
       <TableToolbar
         table={table}
-        globalFilter={globalFilter}
-        setGlobalFilter={setGlobalFilter}
+        globalFilter={globalFilterInput}
+        setGlobalFilter={setGlobalFilterInput}
         viewMode={viewMode}
-        setViewMode={setViewMode}
+        setViewMode={handleSetViewMode}
         showFilters={showFilters}
-        setShowFilters={setShowFilters}
+        setShowFilters={handleSetShowFilters}
+        onClearFilters={handleClearFilters}
       />
 
       {showFilters && <TableFilters table={table} />}
 
       <div className="flex flex-col flex-1 min-h-0" role="table" aria-label="Employee Directory">
         <TableHeader table={table} />
-
-        {viewMode === 'virtual' ? (
-          <VirtualTableBody table={table} />
-        ) : (
-          <PaginatedTableBody table={table} />
-        )}
+        {viewMode === 'virtual' ? <VirtualTableBody table={table} /> : <PaginatedTableBody table={table} />}
       </div>
 
       {viewMode === 'paginated' && <TablePagination table={table} />}

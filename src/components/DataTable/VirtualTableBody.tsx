@@ -1,7 +1,8 @@
-import { useRef } from 'react';
+import { useRef, useMemo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Table } from '@tanstack/react-table';
 import type { Employee } from '../../types';
+import { useTableContext } from '../../context/TableContext';
 import { EditableRow } from './EditableRow';
 import { ROW_HEIGHT } from './constants';
 
@@ -10,7 +11,8 @@ interface VirtualTableBodyProps {
 }
 
 export function VirtualTableBody({ table }: VirtualTableBodyProps) {
-  const rows = table.getSortedRowModel().rows;
+  const { editingRowId, dirtyRowIds, startEdit, saveRow, cancelEdit, undoRow } = useTableContext();
+  const rows = useMemo(() => table.getSortedRowModel().rows, [table]);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const virtualizer = useVirtualizer({
@@ -42,6 +44,12 @@ export function VirtualTableBody({ table }: VirtualTableBodyProps) {
               key={row.id}
               row={row}
               style={{ height: ROW_HEIGHT }}
+              isEditing={editingRowId === row.original.id}
+              isDirty={dirtyRowIds.has(row.original.id)}
+              startEdit={startEdit}
+              saveRow={saveRow}
+              cancelEdit={cancelEdit}
+              undoRow={undoRow}
             />
           );
         })}

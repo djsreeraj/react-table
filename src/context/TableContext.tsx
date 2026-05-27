@@ -5,15 +5,13 @@ import type { Employee } from '../types';
 interface TableState {
   rows: Employee[];
   editingRowId: string | null;
-  editDraft: Partial<Employee>;
   originalRows: Record<string, Employee>;
   dirtyRowIds: Set<string>;
 }
 
 type Action =
   | { type: 'START_EDIT'; rowId: string }
-  | { type: 'UPDATE_DRAFT'; field: keyof Employee; value: string | number }
-  | { type: 'SAVE_ROW' }
+  | { type: 'SAVE_ROW'; rowId: string; draft: Partial<Employee> }
   | { type: 'CANCEL_EDIT' }
   | { type: 'UNDO_ROW'; rowId: string };
 
@@ -25,44 +23,34 @@ function reducer(state: TableState, action: Action): TableState {
       return {
         ...state,
         editingRowId: action.rowId,
-        editDraft: { ...row },
         originalRows: state.originalRows[action.rowId]
           ? state.originalRows
           : { ...state.originalRows, [action.rowId]: row },
       };
     }
 
-    case 'UPDATE_DRAFT': {
-      return {
-        ...state,
-        editDraft: { ...state.editDraft, [action.field]: action.value },
-      };
-    }
-
     case 'SAVE_ROW': {
-      if (!state.editingRowId) return state;
       const updatedRows = state.rows.map(r =>
-        r.id === state.editingRowId ? { ...r, ...state.editDraft } : r
+        r.id === action.rowId ? { ...r, ...action.draft } : r
       );
       const newDirty = new Set(state.dirtyRowIds);
-      const original = state.originalRows[state.editingRowId];
-      const saved = updatedRows.find(r => r.id === state.editingRowId)!;
+      const original = state.originalRows[action.rowId];
+      const saved = updatedRows.find(r => r.id === action.rowId)!;
       if (original && JSON.stringify(original) !== JSON.stringify(saved)) {
-        newDirty.add(state.editingRowId);
+        newDirty.add(action.rowId);
       } else {
-        newDirty.delete(state.editingRowId);
+        newDirty.delete(action.rowId);
       }
       return {
         ...state,
         rows: updatedRows,
         editingRowId: null,
-        editDraft: {},
         dirtyRowIds: newDirty,
       };
     }
 
     case 'CANCEL_EDIT': {
-      return { ...state, editingRowId: null, editDraft: {} };
+      return { ...state, editingRowId: null };
     }
 
     case 'UNDO_ROW': {
@@ -78,7 +66,6 @@ function reducer(state: TableState, action: Action): TableState {
         dirtyRowIds: newDirty,
         originalRows: newOriginals,
         editingRowId: state.editingRowId === action.rowId ? null : state.editingRowId,
-        editDraft: state.editingRowId === action.rowId ? {} : state.editDraft,
       };
     }
 
@@ -90,12 +77,10 @@ function reducer(state: TableState, action: Action): TableState {
 interface TableContextValue {
   rows: Employee[];
   editingRowId: string | null;
-  editDraft: Partial<Employee>;
   dirtyRowIds: Set<string>;
   originalRows: Record<string, Employee>;
   startEdit: (rowId: string) => void;
-  updateDraft: (field: keyof Employee, value: string | number) => void;
-  saveRow: () => void;
+  saveRow: (rowId: string, draft: Partial<Employee>) => void;
   cancelEdit: () => void;
   undoRow: (rowId: string) => void;
 }
@@ -106,30 +91,26 @@ export function TableProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, {
     rows: INITIAL_DATA,
     editingRowId: null,
-    editDraft: {},
     originalRows: {},
     dirtyRowIds: new Set<string>(),
   });
 
   const startEdit = useCallback((rowId: string) => dispatch({ type: 'START_EDIT', rowId }), []);
-  const updateDraft = useCallback((field: keyof Employee, value: string | number) =>
-    dispatch({ type: 'UPDATE_DRAFT', field, value }), []);
-  const saveRow = useCallback(() => dispatch({ type: 'SAVE_ROW' }), []);
+  const saveRow = useCallback((rowId: string, draft: Partial<Employee>) =>
+    dispatch({ type: 'SAVE_ROW', rowId, draft }), []);
   const cancelEdit = useCallback(() => dispatch({ type: 'CANCEL_EDIT' }), []);
   const undoRow = useCallback((rowId: string) => dispatch({ type: 'UNDO_ROW', rowId }), []);
 
   const value = useMemo(() => ({
     rows: state.rows,
     editingRowId: state.editingRowId,
-    editDraft: state.editDraft,
     dirtyRowIds: state.dirtyRowIds,
     originalRows: state.originalRows,
     startEdit,
-    updateDraft,
     saveRow,
     cancelEdit,
     undoRow,
-  }), [state, startEdit, updateDraft, saveRow, cancelEdit, undoRow]);
+  }), [state, startEdit, saveRow, cancelEdit, undoRow]);
 
   return <TableContext.Provider value={value}>{children}</TableContext.Provider>;
 }
