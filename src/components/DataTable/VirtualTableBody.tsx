@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react';
+import { useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Table } from '@tanstack/react-table';
 import type { Employee } from '../../types';
@@ -12,7 +12,7 @@ interface VirtualTableBodyProps {
 
 export function VirtualTableBody({ table }: VirtualTableBodyProps) {
   const { editingRowId, dirtyRowIds, startEdit, saveRow, cancelEdit, undoRow } = useTableContext();
-  const rows = useMemo(() => table.getSortedRowModel().rows, [table]);
+  const rows = table.getSortedRowModel().rows;
   const containerRef = useRef<HTMLDivElement>(null);
 
   const virtualizer = useVirtualizer({

@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import type { Table } from '@tanstack/react-table';
 import type { Employee } from '../../types';
 import { useTableContext } from '../../context/TableContext';
@@ -10,7 +9,7 @@ interface PaginatedTableBodyProps {
 
 export function PaginatedTableBody({ table }: PaginatedTableBodyProps) {
   const { editingRowId, dirtyRowIds, startEdit, saveRow, cancelEdit, undoRow } = useTableContext();
-  const rows = useMemo(() => table.getPaginationRowModel().rows, [table]);
+  const rows = table.getPaginationRowModel().rows;
 
   if (rows.length === 0) {
     return (
