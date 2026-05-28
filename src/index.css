@@ -39,6 +39,15 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
 }
 
+/* Confirm dialog card entrance */
+@keyframes dialog-in {
+  from { opacity: 0; transform: scale(0.95) translateY(-8px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+.animate-in {
+  animation: dialog-in 0.15s ease-out forwards;
+}
+
 /* Number input hide arrows */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {

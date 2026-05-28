@@ -17,6 +17,8 @@ export interface EditableRowProps {
   saveRow: (rowId: string, draft: Partial<Employee>) => void;
   cancelEdit: () => void;
   undoRow: (rowId: string) => void;
+  onDraftChange?: (isDirty: boolean) => void;
+  requestConfirm?: (message: string, title?: string) => Promise<boolean>;
 }
 
 function PerformanceBar({ value }: { value: number }) {
@@ -69,16 +71,37 @@ function EditableCell({
   );
 }
 
-function EditableRowInner({ row, style, isEditing, isDirty, startEdit, saveRow, cancelEdit, undoRow }: EditableRowProps) {
+function EditableRowInner({ row, style, isEditing, isDirty, startEdit, saveRow, cancelEdit, undoRow, onDraftChange }: EditableRowProps) {
   const [draft, setDraft] = useState<Employee>(row.original);
+
   useEffect(() => {
     if (isEditing) setDraft({ ...row.original });
   }, [isEditing]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Report dirty state to parent so it can intercept row switches
+  useEffect(() => {
+    if (!isEditing) return;
+    const dirty = JSON.stringify(draft) !== JSON.stringify(row.original);
+    onDraftChange?.(dirty);
+  }, [draft, isEditing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateField = (field: keyof Employee, value: string | number) =>
     setDraft(prev => ({ ...prev, [field]: value }));
 
   const handleSave = () => saveRow(row.original.id, draft);
+
+  const isDraftDirty = () => JSON.stringify(draft) !== JSON.stringify(row.original);
+
+  const handleCancel = async () => {
+    if (isDraftDirty()) {
+      const ok = requestConfirm
+        ? await requestConfirm('Any changes you made will be lost.', 'Discard changes?')
+        : window.confirm('Discard unsaved changes?');
+      if (!ok) return;
+    }
+    cancelEdit();
+  };
+
   const data = isEditing ? draft : row.original;
 
   return (
@@ -88,7 +111,7 @@ function EditableRowInner({ row, style, isEditing, isDirty, startEdit, saveRow, 
       onDoubleClick={() => { if (!isEditing) startEdit(row.original.id); }}
       onKeyDown={e => {
         if (isEditing && e.key === 'Enter') { e.preventDefault(); handleSave(); }
-        if (isEditing && e.key === 'Escape') cancelEdit();
+        if (isEditing && e.key === 'Escape') handleCancel();
       }}
       className={`
         grid ${GRID_COLS} items-center
@@ -197,7 +220,7 @@ function EditableRowInner({ row, style, isEditing, isDirty, startEdit, saveRow, 
               </svg>
               Save
             </Button>
-            <Button variant="danger" size="xs" onClick={cancelEdit} title="Cancel (Esc)">
+            <Button variant="danger" size="xs" onClick={handleCancel} title="Cancel (Esc)">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
